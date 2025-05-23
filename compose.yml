@@ -1,0 +1,47 @@
+services:
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.letsencrypt.acme.tlschallenge=true
+      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./letsencrypt:/letsencrypt
+    networks:
+      - traefik-network
+      
+  app:
+    image: ghcr.io/nogringo/test_api:main
+    container_name: node-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.app.rule=Host(`${DOMAIN}`)
+      - traefik.http.routers.app.entrypoints=websecure
+      - traefik.http.routers.app.tls.certresolver=letsencrypt
+      - traefik.http.routers.app.tls.domains[0].main=${DOMAIN}
+      - traefik.http.services.app.loadbalancer.server.port=3000
+      - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+      - traefik.http.routers.app-redirect.rule=Host(`${DOMAIN}`)
+      - traefik.http.routers.app-redirect.entrypoints=web
+      - traefik.http.routers.app-redirect.middlewares=redirect-to-https
+    networks:
+      - traefik-network
+    environment:
+      - NODE_ENV=production
+
+networks:
+  traefik-network:
+    driver: bridge
