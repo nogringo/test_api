@@ -51,4 +51,4 @@ jobs:
           key: ${{ env.SSH_KEY }}
           script: |
             docker pull ghcr.io/nogringo/test_api:main
-            docker-compose down && docker-compose up -d
+            docker compose down && docker compose up -d
